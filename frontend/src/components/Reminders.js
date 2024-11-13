@@ -1,28 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, List, ListItem, ListItemText, Snackbar } from '@mui/material';
-import eventService from '../services/eventService'; 
+import eventService from '../services/eventService';
 
 const Reminder = () => {
   const [reminders, setReminders] = useState([]);
-  const [activeReminders, setActiveReminders] = useState([]); 
-  const [reminderStatus, setReminderStatus] = useState({}); 
+  const [activeReminders, setActiveReminders] = useState([]);
+  const [reminderStatus, setReminderStatus] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [openSnackbar, setOpenSnackbar] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState(''); 
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   useEffect(() => {
     const fetchReminders = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const fetchedReminders = await eventService.getReminders();
-        const upcomingReminders = fetchedReminders.filter(event => {
+        const fetchedEvents = await eventService.getEvents(); // Fetch events from the service
+        const upcomingReminders = fetchedEvents.filter(event => {
           const reminderTime = new Date(event.reminderTime);
-          return reminderTime > new Date(); 
+          return reminderTime > new Date();
         });
-        setReminders(fetchedReminders);
-        setActiveReminders(upcomingReminders); 
+        setReminders(fetchedEvents);
+        setActiveReminders(upcomingReminders);
       } catch (error) {
         console.error('Error fetching reminders:', error);
         setError('Failed to fetch reminders. Please try again later.');
@@ -32,32 +32,31 @@ const Reminder = () => {
     };
 
     fetchReminders();
-    const interval = setInterval(fetchReminders, 60000); 
+    const interval = setInterval(fetchReminders, 60000);
 
     return () => clearInterval(interval);
-  }, []); 
+  }, []);
 
-  const handleSnooze = async (reminderId) => {
+  const handleSnooze = async (eventId) => {
     try {
-      const reminder = reminders.find(reminder => reminder._id === reminderId);
-      const snoozeTime = new Date(reminder.reminderTime);
-      snoozeTime.setMinutes(snoozeTime.getMinutes() + 10); 
+      const event = reminders.find(event => event._id === eventId);
+      const snoozeTime = new Date(event.reminderTime);
+      snoozeTime.setMinutes(snoozeTime.getMinutes() + 10);
 
-      await eventService.updateReminder(reminderId, { reminderTime: snoozeTime.toISOString() });
+      await eventService.updateEvent(eventId, { reminderTime: snoozeTime.toISOString() });
 
       setReminderStatus(prevState => ({
         ...prevState,
-        [reminderId]: 'snoozed',
+        [eventId]: 'snoozed',
       }));
 
-      const updatedReminders = await eventService.getReminders();
-      const updatedActiveReminders = updatedReminders.filter(event => {
+      const updatedEvents = await eventService.getEvents();
+      const updatedActiveReminders = updatedEvents.filter(event => {
         const reminderTime = new Date(event.reminderTime);
-        return reminderTime > new Date(); 
+        return reminderTime > new Date();
       });
       setActiveReminders(updatedActiveReminders);
 
-      
       setSnackbarMessage('Reminder snoozed successfully!');
       setOpenSnackbar(true);
     } catch (error) {
@@ -67,16 +66,15 @@ const Reminder = () => {
     }
   };
 
-  const handleStop = async (reminderId) => {
+  const handleStop = async (eventId) => {
     try {
-      await eventService.deleteReminder(reminderId); 
+      await eventService.updateEvent(eventId, { reminderTime: null });
 
-     
-      setActiveReminders(prevState => prevState.filter(reminder => reminder._id !== reminderId));
+      setActiveReminders(prevState => prevState.filter(event => event._id !== eventId));
 
       setReminderStatus(prevState => ({
         ...prevState,
-        [reminderId]: 'stopped',
+        [eventId]: 'stopped',
       }));
 
       setSnackbarMessage('Reminder stopped successfully!');
@@ -104,18 +102,18 @@ const Reminder = () => {
         {activeReminders.length === 0 ? (
           <Typography>No upcoming reminders.</Typography>
         ) : (
-          activeReminders.map((reminder) => (
-            <ListItem key={reminder._id}>
+          activeReminders.map((event) => (
+            <ListItem key={event._id}>
               <ListItemText
-                primary={reminder.title}
-                secondary={`Reminder Time: ${new Date(reminder.reminderTime).toLocaleString()}`}
+                primary={event.title}
+                secondary={`Reminder Time: ${new Date(event.reminderTime).toLocaleString()}`}
               />
-              {reminderStatus[reminder._id] !== 'stopped' && (
+              {reminderStatus[event._id] !== 'stopped' && (
                 <>
                   <Button
                     variant="contained"
                     color="primary"
-                    onClick={() => handleSnooze(reminder._id)}
+                    onClick={() => handleSnooze(event._id)}
                     sx={{ marginRight: 2 }}
                   >
                     Snooze
@@ -123,7 +121,7 @@ const Reminder = () => {
                   <Button
                     variant="contained"
                     color="secondary"
-                    onClick={() => handleStop(reminder._id)}
+                    onClick={() => handleStop(event._id)}
                   >
                     Stop
                   </Button>
